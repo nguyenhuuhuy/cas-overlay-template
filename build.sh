@@ -1,97 +1,160 @@
 #!/bin/bash
 
-
 function copy() {
-	echo -e "Creating configuration directory under /etc/cas"
-	mkdir -p /etc/cas/config
-
-	echo -e "Copying configuration files from etc/cas to /etc/cas"
-	cp -rfv etc/cas/* /etc/cas
+	./gradlew copyCasConfiguration "$@"
 }
 
 function help() {
-	echo "Usage: build.sh [copy|clean|package|run|debug|bootrun|gencert]"
-	echo "	copy: Copy config from ./etc/cas/config to /etc/cas/config"
-	echo "	clean: Clean Maven build directory"
-	echo "	package: Clean and build CAS war, also call copy"
-	echo "	run: Build and run CAS.war via spring boot (java -jar target/cas.war)"
-	echo "	debug: Run CAS.war and listen for Java debugger on port 5000"
-	echo "	bootrun: Run with maven spring boot plugin, doesn't work with multiple dependencies"
-	echo "	gencert: Create keystore with SSL certificate in location where CAS looks by default"
+	casVersion=$(./gradlew casVersion --quiet)
+	clear
+	echo "******************************************************************"
+	tput setaf 2
+	echo "Apereo CAS $casVersion"
+	echo "Enterprise Single SignOn for all earthlings and beyond"
+	tput sgr 0
+	echo "- https://github.com/apereo/cas"
+	echo "- https://apereo.github.io/cas"
+	echo "******************************************************************"
+
+	echo -e "Usage: build.sh [command]\n"
+	echo -e "\tThe following commands are available:\n"
+	echo -e "\tclean: \t\tClean Maven build directory"
+	echo -e "\tcli: \t\tRun the CAS command line shell and pass commands"
+	echo -e "\tcopy: \t\tCopy config from the project's local etc/cas/config directory to the root /etc/cas/config"
+	echo -e "\tdebug: \t\tRun cas.war and listen for Java debugger on port 5000"
+	echo -e "\tdependencies: \tGet a report of all dependencies configured in the build"
+	echo -e "\tdocker: \tBuild a Docker image based on the current build and configuration"
+	echo -e "\tgencert: \tCreate keystore with SSL certificate in location where CAS looks by default"
+	echo -e "\tgetview: \tAsk for a view name to be included in the overlay for customizations"
+	echo -e "\tgetresource: \tAsk for a resource name (properties/json/etc file) to be included in the overlay for customizations"
+	echo -e "\tlistviews: \tList all CAS views that ship with the web application and can be customized in the overlay"
+	echo -e "\tpackage: \tClean and build CAS war"
+	echo -e "\texplode: \tExplode and unzip and packaged CAS war"
+	echo -e "\trun: \t\tBuild and run cas.war via Java as an executable war"
+	echo -e "\trunalone: \tBuild and run cas.war on its own as a standalone executable"
+	echo -e "\ttomcat: \tDeploy the CAS web application to an external Apache Tomcat server"
+	echo -e "\tupdate: \tPackage the CAS overlay by force-updating dependencies and SNAPSHOT versions"
 }
 
 function clean() {
-	./mvnw clean "$@"
+	./gradlew clean "$@"
 }
 
 function package() {
-	./mvnw clean package -T 5 "$@"
-	copy
+	./gradlew clean build "$@"
 }
 
-function bootrun() {
-	./mvnw clean package spring-boot:run -T 5 "$@"
+function update() {
+	./gradlew clean build --refresh-dependencies "$@"
+}
+
+function dependencies() {
+	./gradlew allDependencies
+}
+
+function tomcat() {
+	./gradlew tomcatDeploy "$@"
 }
 
 function debug() {
-	package && java -Xdebug -Xrunjdwp:transport=dt_socket,address=5000,server=y,suspend=n -jar target/cas.war
+	./gradlew debug "$@"
 }
 
 function run() {
-	package && java -jar target/cas.war
+	./gradlew run "$@"
+}
+
+function runalone() {
+	./gradlew clean executable
+}
+
+function jibdocker() {
+   ./gradlew clean build jibDockerBuild "$@"
+}
+
+function listviews() {
+	./gradlew listTemplateViews "$@"
+}
+
+function explodeApp() {
+	./gradlew explodeWar
+}
+
+function getresource() {
+	./gradlew getResource -PresourceName="$@"
+}
+
+function getview() {
+	./gradlew getResource -PresourceName="$@"
 }
 
 function gencert() {
-	if [[ ! -d /etc/cas ]] ; then 
-		copy
-	fi
-	which keytool
-	if [[ $? -ne 0 ]] ; then
-	    echo Error: Java JDK \'keytool\' is not installed or is not in the path
-	    exit 1
-	fi
-	# override DNAME and CERT_SUBJ_ALT_NAMES before calling or use dummy values
-	DNAME="${DNAME:-CN=cas.example.org,OU=Example,OU=Org,C=US}"
-	CERT_SUBJ_ALT_NAMES="${CERT_SUBJ_ALT_NAMES:-dns:example.org,dns:localhost,ip:127.0.0.1}"
-	echo "Generating keystore for CAS with DN ${DNAME}"
-	keytool -genkeypair -alias cas -keyalg RSA -keypass changeit -storepass changeit -keystore /etc/cas/thekeystore -dname ${DNAME} -ext SAN=${CERT_SUBJ_ALT_NAMES}
-	keytool -exportcert -alias cas -storepass changeit -keystore /etc/cas/thekeystore -file /etc/cas/cas.cer
+	./gradlew createKeystore "$@"
 }
 
-if [ $# -eq 0 ]; then
-    echo -e "No commands provided. Defaulting to [run]\n"
-    run
-    exit 0
+function cli() {
+	./gradlew downloadShell runShell "$@"
+}
+
+command=$1
+
+if [ -z "$command" ]; then
+    echo "No commands provided. Defaulting to [run]"
+	command="run"
 fi
 
+shift 1
 
-case "$1" in
+case "$command" in
 "copy")
-    copy 
+    copy
     ;;
-"clean")
-	shift
-    clean "$@"
-    ;;   
-"package")
-	shift
-    package "$@"
-    ;;
-"bootrun")
-	shift
-    bootrun "$@"
-    ;;
-"debug")
-    debug "$@"
-    ;;
-"run")
-    run "$@"
-    ;;
-"gencert")
-    gencert "$@"
-    ;;
-*)
+"help")
     help
     ;;
+"clean")
+	clean "$@"
+	;;
+"package"|"build")
+	package "$@"
+	;;
+"debug")
+	debug "$@"
+	;;
+"run")
+	run "$@"
+	;;
+"explode")
+	explodeApp "$@"
+	;;
+"docker")
+	jibdocker "$@"
+	;;
+"gencert")
+	gencert "$@"
+	;;
+"cli")
+	cli "$@"
+	;;
+"update")
+	update "$@"
+	;;
+"dependencies")
+	update "$@"
+	;;
+"runalone")
+	runalone "$@"
+	;;
+"listviews")
+	listviews "$@"
+	;;
+"getview")
+	getview "$@"
+	;;
+"getresource")
+	getresource "$@"
+	;;
+"tomcat")
+	tomcat
+	;;
 esac
-
