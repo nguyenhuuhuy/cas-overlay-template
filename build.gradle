@@ -41,6 +41,12 @@ apply plugin: "com.google.cloud.tools.jib"
 
 dependencies {
     compile "org.apereo.cas:cas-server-webapp${project.appServer}:${casServerVersion}"
+    compile "org.apereo.cas:cas-server-support-json-service-registry:${casServerVersion}"
+    compile "org.apereo.cas:cas-server-support-rest:${casServerVersion}"
+    compile "org.apereo.cas:cas-server-support-jpa-ticket-registry:${casServerVersion}"
+    compile "org.apereo.cas:cas-server-support-jdbc-drivers:${casServerVersion}"
+    compile "org.apereo.cas:cas-server-support-jdbc-monitor:${casServerVersion}"
+    compile "org.apereo.cas:cas-server-support-rest-authentication:${casServerVersion}"
     // Other CAS dependencies/modules may be listed here...
 }
 
